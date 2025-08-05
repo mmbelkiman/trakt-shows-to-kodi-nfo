@@ -16,7 +16,7 @@ export async function fetchExtendedEpisodeData(
     }
 
     const response = await fetch(
-        `https://api.trakt.tv/shows/${slug}/seasons/${season}/episodes/${episode}?extended=full`,
+        `https://api.trakt.tv/shows/${slug}/seasons/${season}/episodes/${episode}?extended=full%2Cimages`,
         {
             headers: {
                 "Content-Type": "application/json",

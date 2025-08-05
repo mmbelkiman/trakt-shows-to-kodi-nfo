@@ -38,7 +38,7 @@ export async function generateEpisodeNFOs({
     const { genres } = show;
 
     for (const seasonKey of Object.keys(filesToDownloadNFO)) {
-        const seasonData = filesToDownloadNFO[Number(seasonKey)];
+        const seasonData = filesToDownloadNFO[seasonKey as any];
 
         for (const episodeKey of Object.keys(seasonData)) {
             const { path: episodeDir, file } = seasonData[Number(episodeKey)];
@@ -115,7 +115,12 @@ export async function generateEpisodeNFOs({
             const nfoPath = fileWithPath.replace(path.extname(fileWithPath), ".nfo");
             await fsPromises.writeFile(nfoPath, xml, "utf-8");
 
-            if (screenshotUrl) {
+            const DOWNLOAD_EPISODE_IMAGES = process.env.DOWNLOAD_EPISODE_IMAGES === "true";
+            if (!DOWNLOAD_EPISODE_IMAGES) {
+                console.warn("⚠️ Skipping season image download (DOWNLOAD_EPISODE_IMAGES is disabled).");
+            }
+
+            if (screenshotUrl && DOWNLOAD_EPISODE_IMAGES) {
                 const imagePath = fileWithPath.replace(path.extname(fileWithPath), ".jpg");
                 await downloadEpisodesImage(screenshotUrl, imagePath);
             }

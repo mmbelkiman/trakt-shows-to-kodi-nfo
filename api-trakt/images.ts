@@ -65,6 +65,11 @@ export const downloadSeasonImage = async (url: string, destPath: string) => {
     await downloadAndSaveImage(url, destPath, {stripWebp: true});
 }
 export const downloadEpisodesImage = async (url: string, destPath: string) => {
+    const DOWNLOAD_EPISODE_IMAGES = process.env.DOWNLOAD_EPISODE_IMAGES === "true";
+    if (!DOWNLOAD_EPISODE_IMAGES) {
+        return;
+    }
+
     await downloadAndSaveImage(url, destPath);
 }
 
