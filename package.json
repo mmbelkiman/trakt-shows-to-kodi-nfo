@@ -1,0 +1,22 @@
+{
+  "name": "trakt-shows-to-kodi-nfo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "dependencies": {
+    "@types/node": "^24.1.0",
+    "boxen": "^5.1.2",
+    "chalk": "^4.1.2",
+    "dotenv": "^17.2.1",
+    "enquirer": "^2.4.1",
+    "fast-xml-parser": "^5.2.5",
+    "js2xmlparser": "^5.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
