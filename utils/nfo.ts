@@ -93,7 +93,7 @@ export async function generateEpisodeNFOs({
                 genre: genres?.join(" / ") || "",
                 director: "",
                 credits: "",
-                premiered: episode.first_aired || "",
+                premiered: episode.first_aired  ? new Date(episode.first_aired ).toISOString().split("T")[0] : "",
                 year: episode.first_aired ? new Date(episode.first_aired).getFullYear() : "",
                 status: "",
                 code: "",
