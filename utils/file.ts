@@ -12,20 +12,24 @@ export async function folderExists(folderPath: string): Promise<boolean> {
     }
 }
 
-export async function processSeasons(basePath: string): Promise<
-    Record<string, Record<number, { path: string; file: string }>>
-> {
+export async function processSeasons(
+    basePath: string
+): Promise<Record<string, Record<number, { path: string; file: string }>>> {
     const SKIP_EPISODES_WITH_NFO = process.env.SKIP_EPISODES_WITH_NFO === 'true';
+    const IGNORE_FILES_SMALLER_THAN_KB = parseInt(process.env.IGNORE_FILES_SMALLER_THAN_KB || '0', 10);
     const EPISODE_REGEX = /s(\d{2})e(\d{2})/i;
     const IGNORE_FILES_EXTENSIONS = ['.nfo', '.jpg', '.png', '.gif', '.bmp'];
 
-    if(SKIP_EPISODES_WITH_NFO){
+    if (SKIP_EPISODES_WITH_NFO) {
         console.log('⚠️ Skipping episodes with existing NFO files.');
+    }
+    if (IGNORE_FILES_SMALLER_THAN_KB > 0) {
+        console.log(`⚠️ Ignoring files smaller than ${IGNORE_FILES_SMALLER_THAN_KB} KB.`);
     }
 
     console.log('🔍 Scanning seasons in folder:', basePath);
 
-    const dirents = await fsPromises.readdir(basePath, { withFileTypes: true });
+    const dirents = await fsPromises.readdir(basePath, {withFileTypes: true});
     const seasonDirs = dirents.filter(d => d.isDirectory() && /^season\s*\d+/i.test(d.name));
 
     const episodesBySeason: Record<string, Record<number, { path: string; file: string }>> = {};
@@ -43,6 +47,14 @@ export async function processSeasons(basePath: string): Promise<
         for (const file of files) {
             const ext = path.extname(file).toLowerCase();
             if (IGNORE_FILES_EXTENSIONS.includes(ext)) continue;
+
+            const filePath = path.join(seasonPath, file);
+
+            if (IGNORE_FILES_SMALLER_THAN_KB > 0) {
+                const stats = await fsPromises.stat(filePath);
+                const fileSizeKB = stats.size / 1024;
+                if (fileSizeKB < IGNORE_FILES_SMALLER_THAN_KB) continue;
+            }
 
             const basename = path.basename(file, ext);
             const match = basename.match(EPISODE_REGEX);
