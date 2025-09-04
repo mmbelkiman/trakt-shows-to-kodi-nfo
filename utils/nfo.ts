@@ -50,16 +50,13 @@ export async function generateEpisodeNFOs({
             const episodeBasic = episodesBySeason[String(seasonNum).padStart(2, "0")]?.find(
                 (ep) => ep.number === episodeNum
             );
-
             if (!episodeBasic) {
-                console.warn(`⚠️ Episode metadata not found for ${file}`);
+                console.warn(`⚠️ Trakt Episode metadata not found for ${file}`);
                 continue;
             }
 
             const episode = await fetchExtendedEpisodeData(showSlug, seasonNum, episodeNum);
-            if (episode === null) {
-                continue;
-            }
+            if (!episode) continue;
 
             let translation;
             if (process.env.FETCH_EPISODES_TRANSLATION === "true") {
@@ -67,59 +64,49 @@ export async function generateEpisodeNFOs({
             }
 
             const title = translation?.title || episode.title || "";
-            const traktId = episode.ids.trakt;
-            const screenshotUrl = episode.images?.screenshot?.[0];
-            const localImageFilename = file.replace(path.extname(file), ".jpg");
             const plot = translation?.overview || episode.overview || "";
+            const traktId = episode.ids.trakt;
+            const localImageFilename = file.replace(path.extname(file), ".jpg");
+            const screenshotUrl = episode.images?.screenshot?.[0];
 
-            const episodeObj = {
+            const episodeObj: Record<string, any> = {
                 title,
-                showtitle: showSlug.replace(/-/g, " "),
                 originaltitle: episode.original_title || title,
-                season: episode.season,
-                episode: episode.number,
-                displayseason: -1,
-                displayepisode: -1,
-                outline: "",
+                showtitle: showSlug.replace(/-/g, " "),
+                season: seasonNum,
+                episode: episodeNum,
+                id: traktId,
+                uniqueid: [
+                    { "@": { type: "trakt", default: "false" }, "#": traktId }
+                ],
+                userrating: episode.rating || 0,
                 plot,
-                tagline: "",
                 runtime: episode.runtime || "",
-                thumb: screenshotUrl ? localImageFilename : "",
-                mpaa: "",
-                uniqueid: {
-                    "@": { type: "trakt", default: "true" },
-                    "#": traktId
-                },
                 genre: genres?.join(" / ") || "",
-                director: "",
-                credits: "",
-                premiered: episode.first_aired  ? new Date(episode.first_aired ).toISOString().split("T")[0] : "",
-                year: episode.first_aired ? new Date(episode.first_aired).getFullYear() : "",
-                status: "",
-                code: "",
+                premiered: episode.first_aired ? new Date(episode.first_aired).toISOString().split("T")[0] : "",
                 aired: episode.first_aired ? new Date(episode.first_aired).toISOString().split("T")[0] : "",
-                studio: "",
-                trailer: "",
-                actor: {
-                    name: "",
-                    role: "",
-                    order: "",
-                    thumb: ""
-                },
-                dateadded: new Date().toISOString().split("T")[0]
+                studio: show.network || "",
+                thumb: screenshotUrl ? localImageFilename : "",
+                dateadded: new Date().toISOString().split("T")[0],
+
+                watched: false,
+                playcount: 0,
+                fileinfo: {},
+                episode_groups: [
+                    { "@": { episode: episodeNum, season: seasonNum, id: "AIRED", name: "" } },
+                ]
             };
 
             const js2xmlparser = require("js2xmlparser");
-            const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n${js2xmlparser.parse("episodedetails", episodeObj)}`;
+            const xml = js2xmlparser.parse("episodedetails", episodeObj, {
+                declaration: { include: true, encoding: "UTF-8" }
+            });
 
             const nfoPath = fileWithPath.replace(path.extname(fileWithPath), ".nfo");
             await fsPromises.writeFile(nfoPath, xml, "utf-8");
 
+            // image download
             const DOWNLOAD_EPISODE_IMAGES = process.env.DOWNLOAD_EPISODE_IMAGES === "true";
-            if (!DOWNLOAD_EPISODE_IMAGES) {
-                console.warn("⚠️ Skipping season image download (DOWNLOAD_EPISODE_IMAGES is disabled).");
-            }
-
             if (screenshotUrl && DOWNLOAD_EPISODE_IMAGES) {
                 const imagePath = fileWithPath.replace(path.extname(fileWithPath), ".jpg");
                 await downloadEpisodesImage(screenshotUrl, imagePath);
@@ -172,10 +159,7 @@ export function buildTvShowNfo({
     const thumbTags = generateThumbTags(folderPath, imageMap);
 
     const uniqueids = [
-        {
-            "@": { type: "trakt", default: "true" },
-            "#": ids.trakt
-        },
+        { "@": { type: "trakt", default: "true" }, "#": ids.trakt },
         ...(ids.imdb ? [{ "@": { type: "imdb", default: "false" }, "#": ids.imdb }] : []),
         ...(ids.tmdb ? [{ "@": { type: "tmdb", default: "false" }, "#": ids.tmdb }] : []),
         ...(ids.tvdb ? [{ "@": { type: "tvdb", default: "false" }, "#": ids.tvdb }] : [])
@@ -210,9 +194,31 @@ export function buildTvShowNfo({
         tvshowObj.studio = [network];
     }
 
-    const customXmlBlocks = [thumbTags, seasonThumbsXml, namedSeasonsXml].filter(Boolean).join("\n");
-
     const js2xmlparser = require("js2xmlparser");
-    const tvshowXml = js2xmlparser.parse("tvshow", tvshowObj);
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<!-- Created on ${new Date().toISOString()} by Trakt2Kodi Script -->\n${tvshowXml}${customXmlBlocks ? `\n${customXmlBlocks}` : ""}`;
+
+
+    let tvshowXml = js2xmlparser.parse("tvshow", tvshowObj, {
+        declaration: { include: false },
+        format: { doubleQuotes: true }
+    });
+
+    const customXmlBlocks = [thumbTags, seasonThumbsXml, namedSeasonsXml].filter(Boolean).join("\n");
+    if (customXmlBlocks) {
+        tvshowXml = injectInsideRoot(tvshowXml, "tvshow", customXmlBlocks);
+    }
+
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<!-- Created on ${new Date().toISOString()} by Trakt2Kodi Script -->\n${tvshowXml}`;
+}
+
+function injectInsideRoot(xml: string, rootTag: string, innerXml: string): string {
+    const closing = `</${rootTag}>`;
+    const idx = xml.lastIndexOf(closing);
+
+    if (idx === -1) return xml; // fallback
+
+    const before = xml.slice(0, idx).trimEnd();
+    const after = xml.slice(idx); // include </rootTag>
+    const block = innerXml.trim();
+
+    return `${before}\n${block}\n${after}`;
 }

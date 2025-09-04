@@ -18,6 +18,8 @@ export async function processSeasons(
     const SKIP_EPISODES_WITH_NFO = process.env.SKIP_EPISODES_WITH_NFO === 'true';
     const IGNORE_FILES_SMALLER_THAN_KB = parseInt(process.env.IGNORE_FILES_SMALLER_THAN_KB || '0', 10);
     const EPISODE_REGEX = /s(\d{2})e(\d{2})/i;
+    const EPISODE_YEAR_REGEX = /s(\d{2,4})e(\d{2})/i;
+
     const IGNORE_FILES_EXTENSIONS = ['.nfo', '.jpg', '.png', '.gif', '.bmp'];
 
     if (SKIP_EPISODES_WITH_NFO) {
@@ -57,7 +59,10 @@ export async function processSeasons(
             }
 
             const basename = path.basename(file, ext);
-            const match = basename.match(EPISODE_REGEX);
+            const match = basename.match(
+                process.env.SEASON_IS_YEAR ?
+                    EPISODE_YEAR_REGEX :
+                    EPISODE_REGEX);
             if (!match) continue;
 
             const fileSeason = match[1];
