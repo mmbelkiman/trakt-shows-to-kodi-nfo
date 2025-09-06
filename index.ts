@@ -10,7 +10,7 @@ import {fetchSeasons} from './api-trakt/seasons';
 import {buildTvShowNfo, generateEpisodeNFOs} from './utils/nfo';
 import {processEpisodesToCreateNFO} from './utils/episodes';
 import {downloadShowImages} from './api-trakt/images';
-import {askInput, confirmShowFromSearchResults, showIntro} from "./utils/messages";
+import {askForManualSlug, askInput, confirmShowFromSearchResults, showIntro} from "./utils/messages";
 
 dotenv.config();
 
@@ -32,7 +32,12 @@ const COUNTRY = process.env.COUNTRY || 'us';
         return;
     }
 
-    const chosenShow = await confirmShowFromSearchResults(results);
+    let chosenShow = await confirmShowFromSearchResults(results);
+
+    if (!chosenShow) {
+        chosenShow = await askForManualSlug();
+    }
+
     if (!chosenShow) {
         console.warn('❌ No show selected. Exiting.');
         return;
@@ -40,8 +45,8 @@ const COUNTRY = process.env.COUNTRY || 'us';
 
     const slug = chosenShow.ids.slug;
 
-    console.log(`===> ✅  Show confirmed: ${chosenShow.title} (${chosenShow.year})`);
-    console.log(`===> 🆔 Slug: ${slug}`);
+    console.log(`----> ✅  Show confirmed: ${chosenShow.title} (${chosenShow.year})`);
+    console.log(`----> 🆔  Slug: ${slug}`);
 
     // Create tvshow.nfo
     const nfoPath = path.join(folderPath, 'tvshow.nfo');

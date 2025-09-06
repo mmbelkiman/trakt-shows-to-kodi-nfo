@@ -3,6 +3,7 @@ import {prompt} from 'enquirer';
 import {TraktShow} from './types';
 import chalk from "chalk";
 import boxen from "boxen";
+import {fetchShowBySlug} from "../api-trakt/tv-show";
 
 /**
  * Prompts a basic CLI question using `readline`.
@@ -65,6 +66,35 @@ export async function confirmShowFromSearchResults(results: { show: TraktShow }[
     }
 
     return null;
+}
+
+/**
+ * Asks the user if they want to manually enter a slug.
+ */
+export async function askForManualSlug(): Promise<TraktShow | null> {
+    const response = await askInput("❓ No show selected. Do you want to try entering a slug manually? (y/n)", "y");
+    if (response.trim().toLowerCase() !== "y") {
+        return null;
+    }
+
+    const slug = await askInput("✍️ Enter the slug of the show:", "");
+    if (!slug) {
+        console.warn("⚠️ No slug entered. Exiting.");
+        return null;
+    }
+
+    const show = await fetchShowBySlug(slug);
+    if (!show) {
+        console.error(`❌ No show found with slug: ${slug}`);
+        return null;
+    }
+
+    console.log(`\n🔎✅ Found show from slug: ${slug}`);
+    console.log(`📺 Title: ${show.title}`);
+    console.log(`🆔 Slug: ${show.ids.slug}`);
+    console.log(`📝 Overview: ${show.overview}`);
+
+    return show;
 }
 
 export function showIntro() {
